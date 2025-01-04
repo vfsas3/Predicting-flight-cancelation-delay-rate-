@@ -1,28 +1,20 @@
 import pandas as pd
 import random
 
-# Function to filter the data and randomly select 250k rows
-def filter_and_select(input_file, output_file, quarter_col='quarter', target_quarter='Quarter 3', num_samples=250000):
-    # Load the CSV file into a pandas DataFrame
-    df = pd.read_csv(input_file)
+# Função para filtrar e selecionar 250 mil linhas do arquivo do dataset
+def filter_and_select(input, output, linhas=250000):
+    # Carrega o dataset em CSV
+    df = pd.read_csv(input)
     
-    # Filter the rows where the quarter column is 'Quarter 3'
-    filtered_df = df[df["Quarter"] == 3]
+    # Filtra apenas as linhas do terceiro trimestre
+    df_filtrado = df[df["Quarter"] == 3]
     
-    # Check if there are enough rows to sample
-    if len(filtered_df) < num_samples:
-        print(f"Warning: Only {len(filtered_df)} rows available. Selecting all of them.")
-        num_samples = len(filtered_df)
+    # Seleciona aleatoriamente 250 mil linhas
+    df_final = df_filtrado.sample(n=linhas, random_state=42)
     
-    # Randomly sample the specified number of rows
-    sampled_df = filtered_df.sample(n=num_samples, random_state=42)
-    
-    # Export the sampled rows to a new CSV file
-    sampled_df.to_csv(output_file, index=False)
-    print(f"Exported {num_samples} rows to {output_file}")
+    # Exporta o resultado para um novo arquivo CSV
+    df_final.to_csv(output, index=False)
+    print('Finalizado')
 
-# Example usage
-input_csv = 'Cleaned_2018_Flights.csv'  # Replace with the path to your input CSV file
-output_csv = 'voos_2018_q3_250k.csv'  # Replace with the desired output file path
-
-filter_and_select(input_csv, output_csv)
+# Chama a função com os arquivos de entrada e saída
+filter_and_select('Cleaned_2018_Flights.csv', 'voos_2018_q3_250k.csv')
