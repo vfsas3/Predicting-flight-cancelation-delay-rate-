@@ -1,53 +1,70 @@
-from pymongo import MongoClient
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql import functions as F
-from pyspark.sql.window import *
-from pyspark.streaming import StreamingContext
 
-def spark_session():
+def spark_():
     return SparkSession.builder \
-        .appName("Voos e atrasos em 2018") \
+        .appName("Voos e Atrasos em 2018") \
         .config("spark.mongodb.input.uri", "mongodb://mongodb:27017/projeto") \
         .config("spark.mongodb.output.uri", "mongodb://mongodb:27017/projeto") \
         .getOrCreate()
 
-def batch_report(spark):
-    # Load data
+def batch(spark):
     df_atrasos = spark.read.format("mongo").option("collection", "atrasos").load()
     df_voos = spark.read.format("mongo").option("collection", "voos").load()
 
-    # Batch report: Total flights and delays per airport
-    airport_summary = df_atrasos.groupBy("airport", "airport_name") \
+    airport_resumo = df_atrasos.groupBy("airport", "airport_name") \
         .agg(
             sum("arr_flights").alias("total_flights"),
             sum("arr_del15").alias("total_delayed_flights"),
             avg("arr_delay").alias("avg_delay_minutes")
         )
-    
-    print("Airport Summary:")
-    airport_summary.show()
+    print("Resumo dos Aeroportos:")
+    airport_resumo.show()
 
-    # Batch report: Revenue generated per airline
-    revenue_summary = df_voos.groupBy("AirlineCompany") \
+    revenue_resumo = df_voos.groupBy("AirlineCompany") \
         .agg(
             sum(col("PricePerTicket") * col("NumTicketsOrdered")).alias("total_revenue"),
             avg("PricePerTicket").alias("avg_ticket_price")
         )
-    
-    print("Revenue Summary:")
-    revenue_summary.show()
+    print("Resumo de Rendimentos por Companhia Aérea:")
+    revenue_resumo.show()
 
-    # Save reports to MongoDB
-    airport_summary.write.format("mongo").option("collection", "airport_summary").mode("overwrite").save()
-    revenue_summary.write.format("mongo").option("collection", "revenue_summary").mode("overwrite").save()
+    airport_resumo.write.format("mongo").option("collection", "batch_aeroporto_resumo").mode("overwrite").save()
+    revenue_resumo.write.format("mongo").option("collection", "batch_rendimento_resumo").mode("overwrite").save()
 
-def streaming_report(spark):
-    pass
+def streaming(spark):
+    df_atrasos = spark.read.format("mongo").option("collection", "atrasos").load()
+    df_voos = spark.read.format("mongo").option("collection", "voos").load()
+
+    df_atrasos = df_atrasos.filter(df_atrasos["year"] == 2018)
+    df_atrasos = df_atrasos.filter((df_atrasos["month"] >= 7) & (df_atrasos["month"] <= 9))
+
+    df_voos = df_voos.toDF(*[col.lower() for col in df_voos.columns])
+
+    airport_resumo_incremental = df_atrasos.groupBy("airport", "airport_name") \
+        .agg(
+            sum("arr_flights").alias("total_flights"),
+            sum("arr_del15").alias("total_delayed_flights"),
+            avg("arr_delay").alias("avg_delay_minutes")
+        )
+    print("Resumo Incremental dos Aeroportos:")
+    airport_resumo_incremental.show()
+
+    revenue_resumo_incremental = df_voos.groupBy("AirlineCompany") \
+        .agg(
+            sum(col("PricePerTicket") * col("NumTicketsOrdered")).alias("total_revenue"),
+            avg("PricePerTicket").alias("avg_ticket_price")
+        )
+    print("Resumo Incremental de Rendimentos por Companhia Aérea:")
+    revenue_resumo_incremental.show()
+
+    airport_resumo_incremental.write.format("mongo").option("collection", "streaming_aeroporto_resumo").mode("append").save()
+    revenue_resumo_incremental.write.format("mongo").option("collection", "streaming_rendimento_resumo").mode("append").save()
 
 if __name__ == "__main__":
-    spark = spark_session()
+    spark = spark_()
 
-    batch_report(spark)
+    batch(spark)
 
-    streaming_report(spark)
+    streaming(spark)
